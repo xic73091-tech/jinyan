@@ -1,0 +1,8 @@
+/target
+*.exe
+*.pdb
+*.dll
+*.so
+*.dylib
+Cargo.lock
+trace_output.txt

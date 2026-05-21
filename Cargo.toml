@@ -1,0 +1,15 @@
+[package]
+name = "chengyan"
+version = "0.1.0"
+edition = "2021"
+description = "诚言编程语言编译器与虚拟机"
+
+[[bin]]
+name = "chengyan"
+path = "src/主.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
