@@ -74,6 +74,7 @@ impl 字节码块 {
     }
 
     pub fn 添加常量(&mut self, 常量: 常量) -> u16 {
+        assert!(self.常量池.len() < u16::MAX as usize, "常量池溢出: 超过65535个常量");
         let 索引 = self.常量池.len() as u16;
         self.常量池.push(常量);
         索引
@@ -84,6 +85,7 @@ impl 字节码块 {
     }
 
     pub fn 回填跳转(&mut self, 地址: usize, 目标: usize) {
+        assert!(地址 + 1 < self.指令.len(), "回填跳转地址越界: {}", 地址);
         let 偏移 = (目标 as i64 - 地址 as i64 - 2) as i16 as u16;
         self.指令[地址] = (偏移 >> 8) as u8;
         self.指令[地址 + 1] = (偏移 & 0xFF) as u8;
@@ -100,48 +102,51 @@ impl 字节码块 {
         while i < self.指令.len() {
             输出.push_str(&格式化!("{:04} ", i));
             let 操作码值 = self.指令[i];
+            let 操作数大小 = match 操作码值 {
+                x if x == 操作码::压入常量 as u8 || x == 操作码::读取全局 as u8 || x == 操作码::设置全局 as u8
+                || x == 操作码::无条件跳转 as u8 || x == 操作码::条件跳转 as u8
+                || x == 操作码::假性跳转 as u8 || x == 操作码::构建数组 as u8
+                || x == 操作码::构建映射 as u8 || x == 操作码::构建实例 as u8
+                || x == 操作码::属性读取 as u8 || x == 操作码::属性设置 as u8 => 2,
+                x if x == 操作码::读取局部 as u8 || x == 操作码::设置局部 as u8
+                || x == 操作码::调用 as u8 => 1,
+                _ => 0,
+            };
+            if i + 1 + 操作数大小 > self.指令.len() {
+                输出.push_str(&格式化!("操作码({}) [不完整]\n", 操作码值));
+                break;
+            }
             match 操作码值 {
                 x if x == 操作码::压入常量 as u8 => {
                     let idx = ((self.指令[i+1] as u16) << 8) | self.指令[i+2] as u16;
                     输出.push_str(&格式化!("压入常量 {}\n", idx));
-                    i += 3;
                 }
                 x if x == 操作码::读取局部 as u8 => {
                     输出.push_str(&格式化!("读取局部 {}\n", self.指令[i+1]));
-                    i += 2;
                 }
                 x if x == 操作码::设置局部 as u8 => {
                     输出.push_str(&格式化!("设置局部 {}\n", self.指令[i+1]));
-                    i += 2;
                 }
                 x if x == 操作码::调用 as u8 => {
                     输出.push_str(&格式化!("调用 {}\n", self.指令[i+1]));
-                    i += 2;
                 }
                 x if x == 操作码::无条件跳转 as u8 => {
                     let 偏移 = ((self.指令[i+1] as u16) << 8) | self.指令[i+2] as u16;
                     输出.push_str(&格式化!("无条件跳转 {}\n", i + 3 + 偏移 as usize));
-                    i += 3;
+                }
+                x if x == 操作码::条件跳转 as u8 => {
+                    let 偏移 = ((self.指令[i+1] as u16) << 8) | self.指令[i+2] as u16;
+                    输出.push_str(&格式化!("条件跳转 {}\n", i + 3 + 偏移 as usize));
                 }
                 x if x == 操作码::假性跳转 as u8 => {
                     let 偏移 = ((self.指令[i+1] as u16) << 8) | self.指令[i+2] as u16;
                     输出.push_str(&格式化!("假性跳转 {}\n", i + 3 + 偏移 as usize));
-                    i += 3;
                 }
                 _ => {
-                    let 操作数大小 = match 操作码值 {
-                        x if x == 操作码::读取全局 as u8 || x == 操作码::设置全局 as u8
-                        || x == 操作码::无条件跳转 as u8 || x == 操作码::条件跳转 as u8
-                        || x == 操作码::假性跳转 as u8 || x == 操作码::构建数组 as u8
-                        || x == 操作码::构建映射 as u8 => 2,
-                        x if x == 操作码::读取局部 as u8 || x == 操作码::设置局部 as u8
-                        || x == 操作码::调用 as u8 => 1,
-                        _ => 0,
-                    };
                     输出.push_str(&格式化!("操作码({})\n", 操作码值));
-                    i += 1 + 操作数大小;
                 }
             }
+            i += 1 + 操作数大小;
         }
         输出
     }

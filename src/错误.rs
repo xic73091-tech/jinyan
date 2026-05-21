@@ -47,14 +47,20 @@ impl fmt::Display for 语法错误 {
 #[derive(Debug)]
 pub enum 编译错误 {
     未定义变量(String, 位置),
+    编译失败(String),
 }
 
 impl fmt::Display for 编译错误 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             编译错误::未定义变量(n, p) => write!(f, "{}: 未定义的变量 '{}'", p, n),
+            编译错误::编译失败(m) => write!(f, "编译错误: {}", m),
         }
     }
+}
+
+impl From<String> for 编译错误 {
+    fn from(消息: String) -> Self { 编译错误::编译失败(消息) }
 }
 
 /// 运行时错误
@@ -72,7 +78,7 @@ impl fmt::Display for 运行时错误 {
         match self {
             运行时错误::类型错误(m) => write!(f, "类型错误: {}", m),
             运行时错误::除以零 => write!(f, "运行时错误: 除以零"),
-            运行时错误::索引越界(i, l) => write!(f, "索引越界: 索引 {} 超出范围 [0, {})", i, l),
+            运行时错误::索引越界(i, _l) => write!(f, "索引越界: 索引 {} 超出范围", i),
             运行时错误::空引用 => write!(f, "运行时错误: 空引用"),
             运行时错误::栈溢出 => write!(f, "运行时错误: 调用栈溢出"),
         }

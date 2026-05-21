@@ -154,14 +154,14 @@ impl 值 {
     pub fn 取余(&self, 右: &值) -> Result<值, String> {
         match (self, 右) {
             (_, 值::整数(0)) => Err("取余除以零".into()),
-            (值::整数(a), 值::整数(b)) => Ok(值::整数(a % b)),
+            (值::整数(a), 值::整数(b)) => a.checked_rem(*b).map(值::整数).ok_or_else(|| "整数取余溢出".into()),
             _ => Err(格式化!("不能对 {} 和 {} 执行取余", self.类型名(), 右.类型名())),
         }
     }
 
     pub fn 取反(&self) -> Result<值, String> {
         match self {
-            值::整数(n) => Ok(值::整数(-n)),
+            值::整数(n) => n.checked_neg().map(值::整数).ok_or_else(|| "整数取反溢出".into()),
             值::小数(n) => Ok(值::小数(-n)),
             _ => Err(格式化!("不能对 {} 取反", self.类型名())),
         }

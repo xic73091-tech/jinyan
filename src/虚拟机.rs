@@ -61,11 +61,12 @@ impl 虚拟机 {
                 x if x == 操作码::逻辑与 as u8 => { let r = self.操作数栈.pop().ok_or(运行时错误::空引用)?; let l = self.操作数栈.pop().ok_or(运行时错误::空引用)?; self.操作数栈.push(值::布尔(l.转布尔() && r.转布尔())); }
                 x if x == 操作码::逻辑或 as u8 => { let r = self.操作数栈.pop().ok_or(运行时错误::空引用)?; let l = self.操作数栈.pop().ok_or(运行时错误::空引用)?; self.操作数栈.push(值::布尔(l.转布尔() || r.转布尔())); }
                 x if x == 操作码::逻辑非 as u8 => { let v = self.操作数栈.pop().ok_or(运行时错误::空引用)?; self.操作数栈.push(值::布尔(!v.转布尔())); }
-                x if x == 操作码::无条件跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; self.指令指针 = (self.指令指针 as i64 + 偏移 as i64) as usize; }
-                x if x == 操作码::条件跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; let 条件 = self.操作数栈.pop().ok_or(运行时错误::空引用)?; if 条件.转布尔() { self.指令指针 = (self.指令指针 as i64 + 偏移 as i64) as usize; } }
-                x if x == 操作码::假性跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; let 条件 = self.操作数栈.last().cloned().ok_or(运行时错误::空引用)?; if !条件.转布尔() { self.操作数栈.pop(); self.指令指针 = (self.指令指针 as i64 + 偏移 as i64) as usize; } else { self.操作数栈.pop(); } }
+                x if x == 操作码::无条件跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; let 目标 = (self.指令指针 as i64 + 偏移 as i64) as usize; if 目标 >= 代码块.指令.len() { return Err(运行时错误::类型错误(格式化!("跳转目标越界: {}", 目标))); } self.指令指针 = 目标; }
+                x if x == 操作码::条件跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; let 条件 = self.操作数栈.pop().ok_or(运行时错误::空引用)?; if 条件.转布尔() { let 目标 = (self.指令指针 as i64 + 偏移 as i64) as usize; if 目标 >= 代码块.指令.len() { return Err(运行时错误::类型错误(格式化!("跳转目标越界: {}", 目标))); } self.指令指针 = 目标; } }
+                x if x == 操作码::假性跳转 as u8 => { let 偏移 = self.读取u16(代码块)? as i16; let 条件 = self.操作数栈.last().cloned().ok_or(运行时错误::空引用)?; if !条件.转布尔() { self.操作数栈.pop(); let 目标 = (self.指令指针 as i64 + 偏移 as i64) as usize; if 目标 >= 代码块.指令.len() { return Err(运行时错误::类型错误(格式化!("跳转目标越界: {}", 目标))); } self.指令指针 = 目标; } else { self.操作数栈.pop(); } }
                 x if x == 操作码::调用 as u8 => {
                     let 参数数量 = self.读取字节(代码块)? as usize;
+                    if self.操作数栈.len() < 参数数量 + 1 { return Err(运行时错误::类型错误(格式化!("调用栈下溢: 需要 {} 个参数，栈中只有 {} 个值", 参数数量, self.操作数栈.len()))); }
                     let 函数位置 = self.操作数栈.len() - 参数数量 - 1;
                     let 函数值 = self.操作数栈[函数位置].clone();
                     match 函数值 {
@@ -190,7 +191,10 @@ impl 虚拟机 {
         Ok(())
     }
 
-    fn 读取字节(&mut self, 代码块: &字节码块) -> Result<u8, 运行时错误> { let b = 代码块.指令[self.指令指针]; self.指令指针 += 1; Ok(b) }
+    fn 读取字节(&mut self, 代码块: &字节码块) -> Result<u8, 运行时错误> {
+        if self.指令指针 >= 代码块.指令.len() { return Err(运行时错误::类型错误("指令指针越界: 字节码不完整".into())); }
+        let b = 代码块.指令[self.指令指针]; self.指令指针 += 1; Ok(b)
+    }
     fn 读取u16(&mut self, 代码块: &字节码块) -> Result<u16, 运行时错误> { let 高 = self.读取字节(代码块)? as u16; let 低 = self.读取字节(代码块)? as u16; Ok((高 << 8) | 低) }
 
     fn 常量转值(&self, 常量: &常量) -> 值 {

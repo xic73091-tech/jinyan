@@ -106,10 +106,14 @@ fn 交互模式() {
     loop {
         打印!("诚言> ");
         use std::io::Write;
-        std::io::stdout().flush().unwrap();
+        let _ = std::io::stdout().flush();
 
         let mut 输入 = String::new();
-        if std::io::stdin().read_line(&mut 输入).is_err() { continue; }
+        match std::io::stdin().read_line(&mut 输入) {
+            Ok(0) => { 打印行!(); break; }
+            Ok(_) => {}
+            Err(_) => { continue; }
+        }
 
         let 输入 = 输入.trim();
         if 输入 == "退出" || 输入 == "exit" { 打印行!("再见！"); break; }
